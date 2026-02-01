@@ -1,0 +1,1 @@
+{"flutter":{"platforms":{"android":{"default":{"projectId":"oxcode-payroll","appId":"1:805302588638:android:8e38c70c7fca91d5331e4f","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"oxcode-payroll","configurations":{"android":"1:805302588638:android:8e38c70c7fca91d5331e4f","ios":"1:805302588638:ios:891fe0fc539c114a331e4f"}}}}}}

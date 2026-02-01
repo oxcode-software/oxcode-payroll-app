@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "805302588638",
+    "project_id": "oxcode-payroll",
+    "storage_bucket": "oxcode-payroll.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:805302588638:android:8e38c70c7fca91d5331e4f",
+        "android_client_info": {
+          "package_name": "com.example.oxcode_payroll"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBUAVfI03LLrDB7dcOkoxbogTGMJlzhsKU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
