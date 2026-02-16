@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:oxcode_payroll/general/core/theme/app_theme.dart';
 import 'package:oxcode_payroll/features/auth/presentation/provider/auth_provider.dart';
 import 'package:oxcode_payroll/features/attendance/presentation/provider/attendance_provider.dart';
-import 'package:oxcode_payroll/features/auth/presentation/provider/subscription_provider.dart';
 import 'package:oxcode_payroll/features/auth/presentation/pages/login_screen.dart';
 import 'package:oxcode_payroll/features/dashboard/presentation/pages/dashboard_screen.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -31,7 +30,6 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => AttendanceProvider()),
-        ChangeNotifierProvider(create: (_) => SubscriptionProvider()),
       ],
       child: const MyApp(),
     ),
@@ -69,6 +67,9 @@ class AuthWrapper extends StatelessWidget {
     return Consumer<AuthProvider>(
       builder: (context, auth, _) {
         if (auth.user != null) {
+          // Initialize Attendance Provider
+          final attendanceProvider = context.read<AttendanceProvider>();
+          attendanceProvider.init(auth.user!.uid);
           return const DashboardScreen();
         }
         return const LoginScreen();

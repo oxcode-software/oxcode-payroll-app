@@ -1,9 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:oxcode_payroll/features/attendance/domain/models/attendance_activity.dart';
+import 'package:oxcode_payroll/features/attendance/domain/models/attendance_record.dart';
 import 'package:oxcode_payroll/general/services/notification_service.dart';
+import 'package:intl/intl.dart';
 
 class AttendanceProvider with ChangeNotifier {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
   bool _isCheckedIn = false;
   bool _isOnBreak = false;
   DateTime? _checkInTime;
@@ -12,6 +17,7 @@ class AttendanceProvider with ChangeNotifier {
   Duration _totalBreakDuration = Duration.zero;
   Timer? _timer;
   String? _selfiePath;
+  String? _currentRecordId;
 
   final List<AttendanceActivity> _activities = [];
 
@@ -32,6 +38,39 @@ class AttendanceProvider with ChangeNotifier {
   TimeOfDay get punchOutTimeSet => _punchOutTimeSet;
 
   final _notificationService = NotificationService();
+
+  Future<void> init(String employeeId) async {
+    await fetchTodayRecord(employeeId);
+  }
+
+  Future<void> fetchTodayRecord(String employeeId) async {
+    final today = DateFormat('yyyy-MM-dd').format(DateTime.now());
+    final docId = "${employeeId}_$today";
+
+    try {
+      final doc = await _firestore.collection('attendance').doc(docId).get();
+      if (doc.exists) {
+        final record = AttendanceRecord.fromMap(doc.data()!);
+        _isCheckedIn = record.punchIn != null && record.punchOut == null;
+        _checkInTime = record.punchIn;
+        _currentRecordId = docId;
+
+        if (_isCheckedIn) {
+          _startTimer();
+        }
+
+        // Populate activities if needed (assuming activities are stored elsewhere or reconstructed)
+        // For now, let's just sync the status
+      } else {
+        _isCheckedIn = false;
+        _checkInTime = null;
+        _currentRecordId = null;
+      }
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error fetching today's record: $e");
+    }
+  }
 
   void updatePunchInReminder(bool enabled, TimeOfDay time) {
     _punchInReminder = enabled;
@@ -81,47 +120,87 @@ class AttendanceProvider with ChangeNotifier {
     return progress.clamp(0.0, 1.0);
   }
 
-  void toggleAttendance(String? imagePath) {
+  Future<void> toggleAttendance(
+    String? imagePath,
+    String employeeId,
+    String employeeName,
+  ) async {
     if (_isCheckedIn) {
-      _checkOut(imagePath);
+      await _checkOut(imagePath, employeeId);
     } else {
-      _checkIn(imagePath);
+      await _checkIn(imagePath, employeeId, employeeName);
     }
   }
 
-  void _checkIn(String? imagePath) {
-    _isCheckedIn = true;
-    _selfiePath = imagePath;
-    _checkInTime = DateTime.now();
-    _activities.insert(
-      0,
-      AttendanceActivity(
-        type: ActivityType.punchIn,
-        time: _checkInTime!,
-        selfiePath: imagePath,
-      ),
+  Future<void> _checkIn(
+    String? imagePath,
+    String employeeId,
+    String employeeName,
+  ) async {
+    final now = DateTime.now();
+    final today = DateFormat('yyyy-MM-dd').format(now);
+    final docId = "${employeeId}_$today";
+
+    final record = AttendanceRecord(
+      id: docId,
+      employeeId: employeeId,
+      employeeName: employeeName,
+      date: now,
+      punchIn: now,
+      checkInSelfieUrl:
+          imagePath, // In a real app, this would be a cloud storage URL
+      status: AttendanceStatus.present,
     );
-    _startTimer();
-    notifyListeners();
+
+    try {
+      await _firestore.collection('attendance').doc(docId).set(record.toMap());
+      _isCheckedIn = true;
+      _selfiePath = imagePath;
+      _checkInTime = now;
+      _currentRecordId = docId;
+      _activities.insert(
+        0,
+        AttendanceActivity(
+          type: ActivityType.punchIn,
+          time: _checkInTime!,
+          selfiePath: imagePath,
+        ),
+      );
+      _startTimer();
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error checking in: $e");
+    }
   }
 
-  void _checkOut(String? imagePath) {
-    if (_isOnBreak) endBreak(null);
-    _isCheckedIn = false;
-    _activities.insert(
-      0,
-      AttendanceActivity(
-        type: ActivityType.punchOut,
-        time: DateTime.now(),
-        selfiePath: imagePath,
-      ),
-    );
-    _selfiePath = null;
-    _stopTimer();
-    notifyListeners();
+  Future<void> _checkOut(String? imagePath, String employeeId) async {
+    if (_isOnBreak) await endBreak(null);
+
+    final now = DateTime.now();
+    try {
+      await _firestore.collection('attendance').doc(_currentRecordId).update({
+        'punchOut': now.toIso8601String(),
+        'checkOutSelfieUrl': imagePath,
+      });
+
+      _isCheckedIn = false;
+      _activities.insert(
+        0,
+        AttendanceActivity(
+          type: ActivityType.punchOut,
+          time: now,
+          selfiePath: imagePath,
+        ),
+      );
+      _selfiePath = null;
+      _stopTimer();
+      notifyListeners();
+    } catch (e) {
+      debugPrint("Error checking out: $e");
+    }
   }
 
-  void startBreak(String? imagePath) {
+  Future<void> startBreak(String? imagePath) async {
     if (!_isCheckedIn || _isOnBreak) return;
     _isOnBreak = true;
     _breakStartTime = DateTime.now();
@@ -136,7 +215,7 @@ class AttendanceProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  void endBreak(String? imagePath) {
+  Future<void> endBreak(String? imagePath) async {
     if (!_isCheckedIn || !_isOnBreak) return;
     final breakEndTime = DateTime.now();
     final breakDuration = breakEndTime.difference(_breakStartTime!);
@@ -158,7 +237,6 @@ class AttendanceProvider with ChangeNotifier {
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_checkInTime != null && !_isOnBreak) {
-        // Effective worked time = Current - Start - Total Break
         _workedDuration =
             DateTime.now().difference(_checkInTime!) - _totalBreakDuration;
         notifyListeners();

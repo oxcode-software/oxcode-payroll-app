@@ -11,6 +11,7 @@ import 'package:oxcode_payroll/features/attendance/presentation/provider/attenda
 import 'package:oxcode_payroll/general/core/widgets/premium_app_bar.dart';
 import 'package:oxcode_payroll/features/attendance/presentation/pages/face_punch_screen.dart';
 import 'package:oxcode_payroll/features/attendance/domain/models/attendance_activity.dart';
+import 'package:oxcode_payroll/features/auth/presentation/provider/auth_provider.dart';
 import 'dart:ui';
 
 class AttendanceScreen extends StatelessWidget {
@@ -271,7 +272,15 @@ class _AttendanceTimerParams extends StatelessWidget {
                           ),
                         );
                         if (result != null) {
-                          provider.toggleAttendance(result as String);
+                          final auth = context.read<AuthProvider>();
+                          final employee = auth.employeeProfile;
+                          if (employee != null) {
+                            await provider.toggleAttendance(
+                              result as String,
+                              employee.id,
+                              employee.name,
+                            );
+                          }
                         }
                       },
                       style: ElevatedButton.styleFrom(

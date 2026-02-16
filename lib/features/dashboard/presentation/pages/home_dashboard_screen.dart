@@ -8,8 +8,6 @@ import 'package:provider/provider.dart';
 import 'package:oxcode_payroll/features/attendance/presentation/provider/attendance_provider.dart';
 import 'package:oxcode_payroll/features/auth/presentation/provider/auth_provider.dart';
 import 'package:oxcode_payroll/general/core/widgets/premium_app_bar.dart';
-import 'package:oxcode_payroll/general/core/widgets/locked_feature_widget.dart';
-import 'package:oxcode_payroll/features/auth/presentation/provider/subscription_provider.dart';
 import 'package:oxcode_payroll/features/notifications/presentation/pages/notification_screen.dart';
 import 'package:oxcode_payroll/features/attendance/presentation/pages/face_punch_screen.dart';
 
@@ -104,14 +102,7 @@ class HomeDashboardScreen extends StatelessWidget {
             SizedBox(height: 32.h),
 
             // Statistics Row
-            FadeInSlide(
-              offset: 30,
-              child: LockedFeatureWidget(
-                featureKey: 'attendance_analytics',
-                message: 'Unlock Analytics',
-                child: const _ModernStatsRow(),
-              ),
-            ),
+            const FadeInSlide(offset: 30, child: _ModernStatsRow()),
             SizedBox(height: 32.h),
 
             // Quick Actions Title
@@ -125,34 +116,7 @@ class HomeDashboardScreen extends StatelessWidget {
                     fontSize: 20.sp,
                   ),
                 ),
-                Consumer<SubscriptionProvider>(
-                  builder: (context, subscription, _) {
-                    return DropdownButton<SubscriptionPlan>(
-                      value: subscription.currentPlan,
-                      underline: const SizedBox(),
-                      icon: Icon(
-                        LucideIcons.crown,
-                        size: 16.w,
-                        color: subscription.getPlanColor(),
-                      ),
-                      onChanged: (plan) {
-                        if (plan != null) subscription.setPlan(plan);
-                      },
-                      items: SubscriptionPlan.values.map((plan) {
-                        return DropdownMenuItem(
-                          value: plan,
-                          child: Text(
-                            plan.name.toUpperCase(),
-                            style: TextStyle(
-                              fontSize: 10.sp,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        );
-                      }).toList(),
-                    );
-                  },
-                ),
+                const SizedBox(),
               ],
             ),
             SizedBox(height: 16.h),
@@ -261,8 +225,16 @@ class _QuickPunchCard extends StatelessWidget {
                 height: 54.h,
                 child: ElevatedButton(
                   onPressed: () async {
+                    final auth = context.read<AuthProvider>();
+                    final employee = auth.employeeProfile;
+                    if (employee == null) return;
+
                     if (isCheckedIn) {
-                      provider.toggleAttendance(null);
+                      await provider.toggleAttendance(
+                        null,
+                        employee.id,
+                        employee.name,
+                      );
                     } else {
                       final result = await Navigator.push(
                         context,
@@ -271,7 +243,11 @@ class _QuickPunchCard extends StatelessWidget {
                         ),
                       );
                       if (result != null) {
-                        provider.toggleAttendance(result as String);
+                        await provider.toggleAttendance(
+                          result as String,
+                          employee.id,
+                          employee.name,
+                        );
                       }
                     }
                   },
@@ -320,26 +296,30 @@ class _ModernStatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      children: [
-        _buildSmallStat(
-          context,
-          "Leave Bal",
-          "12",
-          "Days",
-          LucideIcons.umbrella,
-          Colors.orange,
-        ),
-        SizedBox(width: 16.w),
-        _buildSmallStat(
-          context,
-          "Attendance",
-          "94%",
-          "Monthly",
-          LucideIcons.circleCheck,
-          Colors.green,
-        ),
-      ],
+    return Consumer2<AuthProvider, AttendanceProvider>(
+      builder: (context, auth, attendance, _) {
+        return Row(
+          children: [
+            _buildSmallStat(
+              context,
+              "Leave Bal",
+              "12", // In a full implementation, this would come from auth.employeeProfile?.leaveBalance
+              "Days",
+              LucideIcons.umbrella,
+              Colors.orange,
+            ),
+            SizedBox(width: 16.w),
+            _buildSmallStat(
+              context,
+              "Status",
+              attendance.isCheckedIn ? "Active" : "Off",
+              attendance.isCheckedIn ? "On Clock" : "Not In",
+              LucideIcons.circleCheck,
+              attendance.isCheckedIn ? Colors.green : Colors.grey,
+            ),
+          ],
+        );
+      },
     );
   }
 
