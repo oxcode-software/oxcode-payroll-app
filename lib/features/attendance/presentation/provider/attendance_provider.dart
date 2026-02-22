@@ -1,10 +1,18 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:convert';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:geolocator/geolocator.dart' hide ActivityType;
+import 'package:intl/intl.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 import 'package:oxcode_payroll/features/attendance/domain/models/attendance_activity.dart';
 import 'package:oxcode_payroll/features/attendance/domain/models/attendance_record.dart';
+import 'package:oxcode_payroll/features/attendance/domain/models/punch_request.dart';
+import 'package:oxcode_payroll/features/attendance/domain/models/regularization_request.dart';
 import 'package:oxcode_payroll/general/services/notification_service.dart';
-import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AttendanceProvider with ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -18,6 +26,8 @@ class AttendanceProvider with ChangeNotifier {
   Timer? _timer;
   String? _selfiePath;
   String? _currentRecordId;
+  Position? _lastPosition;
+  final List<PunchRequest> _pending = [];
 
   final List<AttendanceActivity> _activities = [];
 
@@ -39,7 +49,36 @@ class AttendanceProvider with ChangeNotifier {
 
   final _notificationService = NotificationService();
 
+  Future<void> loadPendingQueue() async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getStringList('pending_punches') ?? [];
+    _pending
+      ..clear()
+      ..addAll(raw.map((e) => PunchRequest.fromMap(jsonDecode(e))).toList());
+  }
+
+  Future<void> _persistQueue() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(
+      'pending_punches',
+      _pending.map((e) => jsonEncode(e.toMap())).toList(),
+    );
+  }
+
+  Future<void> _syncQueue() async {
+    final connectivity = await Connectivity().checkConnectivity();
+    if (connectivity == ConnectivityResult.none) return;
+    while (_pending.isNotEmpty) {
+      final req = _pending.first;
+      await _sendPunch(req);
+      _pending.removeAt(0);
+    }
+    await _persistQueue();
+  }
+
   Future<void> init(String employeeId) async {
+    await loadPendingQueue();
+    await _syncQueue();
     await fetchTodayRecord(employeeId);
   }
 
@@ -120,11 +159,131 @@ class AttendanceProvider with ChangeNotifier {
     return progress.clamp(0.0, 1.0);
   }
 
+  Future<bool> _checkLocation() async {
+    bool serviceEnabled;
+    LocationPermission permission;
+
+    serviceEnabled = await Geolocator.isLocationServiceEnabled();
+    if (!serviceEnabled) return false;
+
+    permission = await Geolocator.checkPermission();
+    if (permission == LocationPermission.denied) {
+      permission = await Geolocator.requestPermission();
+      if (permission == LocationPermission.denied) return false;
+    }
+
+    if (permission == LocationPermission.deniedForever) return false;
+
+    final position = await Geolocator.getCurrentPosition();
+    _lastPosition = position;
+    // Example: Office Location (New York) - Should be dynamic in a real app
+    const officeLat = 40.7128;
+    const officeLng = -74.0060;
+    const allowedDistance = 500; // meters
+
+    final distance = Geolocator.distanceBetween(
+      position.latitude,
+      position.longitude,
+      officeLat,
+      officeLng,
+    );
+
+    return distance <= allowedDistance;
+  }
+
+  Future<bool> _checkWiFi() async {
+    final info = NetworkInfo();
+    try {
+      final wifiName = await info.getWifiName(); // "Office_WiFi"
+      // Example: Allowed WiFi SSIDs
+      const allowedSSIDs = ["Office_WiFi", "Oxcode_Guest"];
+      if (wifiName == null) return false;
+      // Note: On some Android versions, this returns <unknown ssid> without permissions
+      return allowedSSIDs.contains(wifiName.replaceAll('"', ''));
+    } catch (e) {
+      debugPrint("WiFi Check Error: $e");
+      return false;
+    }
+  }
+
+  Future<void> punch({
+    required PunchType type,
+    required String employeeId,
+    required String employeeName,
+    String? imagePath,
+    String? qrCode,
+    String? wifiBssid,
+    bool skipLocation = false,
+    bool skipWiFi = false,
+  }) async {
+    final willCheckIn = !_isCheckedIn;
+    await toggleAttendance(
+      imagePath,
+      employeeId,
+      employeeName,
+      skipLocation: skipLocation,
+      skipWiFi: skipWiFi,
+    );
+
+    final request = PunchRequest(
+      id: _firestore.collection('attendance_logs').doc().id,
+      employeeId: employeeId,
+      type: type,
+      createdAt: DateTime.now(),
+      lat: _lastPosition?.latitude,
+      lng: _lastPosition?.longitude,
+      selfieUrl: imagePath,
+      qrCode: qrCode,
+      wifiBssid: wifiBssid,
+      checkIn: willCheckIn,
+    );
+
+    try {
+      await _sendPunch(request);
+      await _syncQueue();
+    } catch (_) {
+      _pending.add(request);
+      await _persistQueue();
+    }
+  }
+
+  Future<void> _sendPunch(PunchRequest request) async {
+    await _firestore
+        .collection('attendance_logs')
+        .doc(request.id)
+        .set(request.toMap());
+  }
+
+  Future<void> submitRegularization(RegularizationRequest req) async {
+    await _firestore
+        .collection('attendance_requests')
+        .doc(req.id)
+        .set(req.toMap());
+  }
+
   Future<void> toggleAttendance(
     String? imagePath,
     String employeeId,
-    String employeeName,
-  ) async {
+    String employeeName, {
+    bool skipLocation = false,
+    bool skipWiFi = false,
+  }) async {
+    if (!skipLocation) {
+      final hasLocation = await _checkLocation();
+      if (!hasLocation) {
+        debugPrint("Out of office location");
+        throw Exception("You are not within the office vicinity.");
+      }
+    }
+
+    if (!skipWiFi) {
+      final hasWiFi = await _checkWiFi();
+      if (!hasWiFi) {
+        debugPrint("Not connected to office WiFi");
+        throw Exception("Please connect to the office WiFi to punch.");
+      }
+    }
+
     if (_isCheckedIn) {
       await _checkOut(imagePath, employeeId);
     } else {

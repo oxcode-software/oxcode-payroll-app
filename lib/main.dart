@@ -5,6 +5,13 @@ import 'package:provider/provider.dart';
 import 'package:oxcode_payroll/general/core/theme/app_theme.dart';
 import 'package:oxcode_payroll/features/auth/presentation/provider/auth_provider.dart';
 import 'package:oxcode_payroll/features/attendance/presentation/provider/attendance_provider.dart';
+import 'package:oxcode_payroll/features/leave/presentation/provider/leave_provider.dart';
+import 'package:oxcode_payroll/features/roster/presentation/provider/shift_provider.dart';
+import 'package:oxcode_payroll/features/payroll/presentation/provider/payroll_provider.dart';
+import 'package:oxcode_payroll/features/expense/presentation/provider/expense_provider.dart';
+import 'package:oxcode_payroll/features/loan/presentation/provider/loan_provider.dart';
+import 'package:oxcode_payroll/features/communication/presentation/provider/announcement_provider.dart';
+import 'package:oxcode_payroll/features/splash/presentation/pages/splash_screen.dart';
 import 'package:oxcode_payroll/features/auth/presentation/pages/login_screen.dart';
 import 'package:oxcode_payroll/features/dashboard/presentation/pages/dashboard_screen.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -30,6 +37,12 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => AttendanceProvider()),
+        ChangeNotifierProvider(create: (_) => LeaveProvider()),
+        ChangeNotifierProvider(create: (_) => ShiftProvider()),
+        ChangeNotifierProvider(create: (_) => PayrollProvider()),
+        ChangeNotifierProvider(create: (_) => ExpenseProvider()),
+        ChangeNotifierProvider(create: (_) => LoanProvider()),
+        ChangeNotifierProvider(create: (_) => AnnouncementProvider()),
       ],
       child: const MyApp(),
     ),
@@ -52,7 +65,7 @@ class MyApp extends StatelessWidget {
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: ThemeMode.light,
-          home: const DashboardScreen(),
+          home: const AuthWrapper(),
         );
       },
     );

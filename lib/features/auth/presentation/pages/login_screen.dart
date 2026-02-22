@@ -17,15 +17,108 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  bool _obscurePassword = true;
+  final _mobileController = TextEditingController();
+  final _otpController = TextEditingController();
+  final _employeeCodeController = TextEditingController();
+  final _employeePasswordController = TextEditingController();
+  bool _otpSent = false;
+  bool _useCodeLogin = false;
 
   @override
   void dispose() {
-    _emailController.dispose();
-    _passwordController.dispose();
+    _mobileController.dispose();
+    _otpController.dispose();
+    _employeeCodeController.dispose();
+    _employeePasswordController.dispose();
     super.dispose();
+  }
+
+  void _showCompanySelectionDialog(List<Map<String, dynamic>> companies) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.r),
+        ),
+        title: Text(
+          'Select Company',
+          style: TextStyle(
+            fontSize: 20.sp,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Multiple companies found for this number. Please select one to continue.',
+                style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
+              ),
+              SizedBox(height: 20.h),
+              ...companies.map(
+                (company) => Padding(
+                  padding: EdgeInsets.only(bottom: 12.h),
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.read<AuthProvider>().loginWithUid(company['uid']);
+                    },
+                    child: Container(
+                      padding: EdgeInsets.all(16.w),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[100],
+                        borderRadius: BorderRadius.circular(12.r),
+                        border: Border.all(color: Colors.grey[300]!),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(
+                            LucideIcons.building,
+                            color: AppColors.primary,
+                            size: 20.w,
+                          ),
+                          SizedBox(width: 12.w),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  company['companyName'],
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16.sp,
+                                  ),
+                                ),
+                                Text(
+                                  'Code: ${company['companyCode']}',
+                                  style: TextStyle(
+                                    color: Colors.grey[600],
+                                    fontSize: 12.sp,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          Icon(
+                            LucideIcons.chevronRight,
+                            color: Colors.grey,
+                            size: 20.w,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -72,7 +165,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Column(
                         children: [
                           Text(
-                            'Welcome Back',
+                            'Corporate Login',
                             style: TextStyle(
                               fontSize: 32.sp,
                               fontWeight: FontWeight.w900,
@@ -83,7 +176,11 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           SizedBox(height: 8.h),
                           Text(
-                            'Sign in to access your employee portal',
+                            _useCodeLogin
+                                ? 'Sign in with your employee code and password'
+                                : (_otpSent
+                                    ? 'Enter the security code sent to your mobile'
+                                    : 'Enter your registered mobile number'),
                             style: TextStyle(
                               fontSize: 15.sp,
                               color: Colors.grey[600],
@@ -96,50 +193,89 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     SizedBox(height: 48.h),
 
+                    // Mode toggle
+                    FadeInSlide(
+                      duration: const Duration(milliseconds: 1100),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          ChoiceChip(
+                            label: const Text('OTP Login'),
+                            selected: !_useCodeLogin,
+                            onSelected: (v) {
+                              setState(() {
+                                _useCodeLogin = false;
+                                _otpSent = false;
+                              });
+                            },
+                          ),
+                          SizedBox(width: 12.w),
+                          ChoiceChip(
+                            label: const Text('Employee Code'),
+                            selected: _useCodeLogin,
+                            onSelected: (v) {
+                              setState(() {
+                                _useCodeLogin = true;
+                                _otpSent = false;
+                              });
+                            },
+                          ),
+                        ],
+                      ),
+                    ),
+                    SizedBox(height: 24.h),
+
                     // Inputs Section
                     FadeInSlide(
                       duration: const Duration(milliseconds: 1200),
                       offset: 30,
                       child: Column(
                         children: [
-                          _buildTextField(
-                            controller: _emailController,
-                            label: 'Email Address',
-                            icon: LucideIcons.mail,
-                            keyboardType: TextInputType.emailAddress,
-                          ),
-                          SizedBox(height: 16.h),
-                          _buildTextField(
-                            controller: _passwordController,
-                            label: 'Password',
-                            icon: LucideIcons.lock,
-                            obscureText: _obscurePassword,
-                            suffixIcon: IconButton(
-                              icon: Icon(
-                                _obscurePassword
-                                    ? LucideIcons.eyeOff
-                                    : LucideIcons.eye,
-                                size: 20.w,
-                                color: Colors.grey[400],
-                              ),
-                              onPressed: () => setState(
-                                () => _obscurePassword = !_obscurePassword,
-                              ),
+                          if (_useCodeLogin) ...[
+                            _buildTextField(
+                              controller: _employeeCodeController,
+                              label: 'Employee Code',
+                              icon: LucideIcons.badgeInfo,
+                              keyboardType: TextInputType.text,
                             ),
-                          ),
+                            SizedBox(height: 16.h),
+                            _buildTextField(
+                              controller: _employeePasswordController,
+                              label: 'Password',
+                              icon: LucideIcons.lock,
+                              keyboardType: TextInputType.visiblePassword,
+                              obscureText: true,
+                            ),
+                          ] else ...[
+                            _buildTextField(
+                              controller: _mobileController,
+                              label: 'Mobile Number',
+                              icon: LucideIcons.phone,
+                              keyboardType: TextInputType.phone,
+                              enabled: !_otpSent,
+                            ),
+                            if (_otpSent) ...[
+                              SizedBox(height: 16.h),
+                              _buildTextField(
+                                controller: _otpController,
+                                label: 'One Time Password',
+                                icon: LucideIcons.keyRound,
+                                keyboardType: TextInputType.number,
+                              ),
+                            ],
+                          ],
                         ],
                       ),
                     ),
 
                     SizedBox(height: 16.h),
-                    FadeInSlide(
-                      duration: const Duration(milliseconds: 1300),
-                      child: Align(
-                        alignment: Alignment.centerRight,
+                    if (_otpSent && !_useCodeLogin)
+                      FadeInSlide(
+                        duration: const Duration(milliseconds: 1300),
                         child: TextButton(
-                          onPressed: () {},
+                          onPressed: () => setState(() => _otpSent = false),
                           child: Text(
-                            'Forgot Password?',
+                            'Change Mobile Number',
                             style: TextStyle(
                               color: AppColors.primary,
                               fontWeight: FontWeight.bold,
@@ -148,7 +284,6 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                    ),
                     SizedBox(height: 32.h),
 
                     // Login Button
@@ -157,14 +292,64 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: Consumer<AuthProvider>(
                         builder: (context, auth, _) {
                           return PremiumButton(
-                            label: 'Sign In',
+                            label: _useCodeLogin
+                                ? 'Login'
+                                : (_otpSent ? 'Verify & Continue' : 'Send OTP'),
                             isLoading: auth.isLoading,
-                            onPressed: () {
+                            onPressed: () async {
                               HapticFeedback.mediumImpact();
-                              auth.login(
-                                _emailController.text,
-                                _passwordController.text,
-                              );
+                              try {
+                                if (_useCodeLogin) {
+                                  await auth.loginWithEmployeeCode(
+                                    employeeCode:
+                                        _employeeCodeController.text.trim(),
+                                    password:
+                                        _employeePasswordController.text.trim(),
+                                  );
+                                } else if (_otpSent) {
+                                  final companies = await auth.verifyMSG91Token(
+                                    _otpController.text,
+                                  );
+
+                                  if (companies.isEmpty) {
+                                    if (mounted) {
+                                      ScaffoldMessenger.of(
+                                        context,
+                                      ).showSnackBar(
+                                        const SnackBar(
+                                          content: Text(
+                                            'No employee record found for this number.',
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  } else if (companies.length == 1) {
+                                    await auth.loginWithUid(
+                                      companies[0]['uid'],
+                                    );
+                                  } else {
+                                    _showCompanySelectionDialog(companies);
+                                  }
+                                } else {
+                                  await auth.sendMSG91Otp(
+                                    _mobileController.text,
+                                  );
+                                  setState(() => _otpSent = true);
+                                }
+                              } catch (e) {
+                                if (mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        e.toString().replaceAll(
+                                          'Exception: ',
+                                          '',
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                              }
                             },
                           );
                         },
@@ -175,25 +360,38 @@ class _LoginScreenState extends State<LoginScreen> {
                     // Footer
                     FadeInSlide(
                       duration: const Duration(milliseconds: 1500),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                      child: Column(
                         children: [
-                          Text(
-                            "Don't have an account? ",
-                            style: TextStyle(
-                              color: Colors.grey[600],
-                              fontSize: 14.sp,
-                            ),
-                          ),
-                          GestureDetector(
-                            onTap: () {},
-                            child: Text(
-                              "Contact HR",
-                              style: TextStyle(
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 14.sp,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                "Employee access only. ",
+                                style: TextStyle(
+                                  color: Colors.grey[600],
+                                  fontSize: 14.sp,
+                                ),
                               ),
+                              GestureDetector(
+                                onTap: () {},
+                                child: Text(
+                                  "Contact HR",
+                                  style: TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14.sp,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12.h),
+                          Text(
+                            "Securely managed by MSG91",
+                            style: TextStyle(
+                              color: Colors.grey[400],
+                              fontSize: 11.sp,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                         ],
@@ -224,43 +422,48 @@ class _LoginScreenState extends State<LoginScreen> {
     bool obscureText = false,
     Widget? suffixIcon,
     TextInputType? keyboardType,
+    bool enabled = true,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.grey[50],
-        borderRadius: BorderRadius.circular(16.r),
-        border: Border.all(color: Colors.grey.withOpacity(0.1)),
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: obscureText,
-        keyboardType: keyboardType,
-        style: TextStyle(
-          fontSize: 16.sp,
-          color: Colors.black,
-          fontWeight: FontWeight.w600,
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.6,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.grey[50],
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: Colors.grey.withOpacity(0.1)),
         ),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: TextStyle(
-            color: Colors.grey[500],
-            fontSize: 14.sp,
-            fontWeight: FontWeight.w500,
+        child: TextField(
+          controller: controller,
+          obscureText: obscureText,
+          keyboardType: keyboardType,
+          enabled: enabled,
+          style: TextStyle(
+            fontSize: 16.sp,
+            color: Colors.black,
+            fontWeight: FontWeight.w600,
           ),
-          prefixIcon: Icon(icon, color: AppColors.primary, size: 20.w),
-          suffixIcon: suffixIcon,
-          border: InputBorder.none,
-          enabledBorder: InputBorder.none,
-          focusedBorder: UnderlineInputBorder(
-            borderSide: const BorderSide(color: AppColors.primary, width: 2),
-            borderRadius: BorderRadius.only(
-              bottomLeft: Radius.circular(16.r),
-              bottomRight: Radius.circular(16.r),
+          decoration: InputDecoration(
+            labelText: label,
+            labelStyle: TextStyle(
+              color: Colors.grey[500],
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w500,
             ),
-          ),
-          contentPadding: EdgeInsets.symmetric(
-            horizontal: 16.w,
-            vertical: 20.h,
+            prefixIcon: Icon(icon, color: AppColors.primary, size: 20.w),
+            suffixIcon: suffixIcon,
+            border: InputBorder.none,
+            enabledBorder: InputBorder.none,
+            focusedBorder: UnderlineInputBorder(
+              borderSide: const BorderSide(color: AppColors.primary, width: 2),
+              borderRadius: BorderRadius.only(
+                bottomLeft: Radius.circular(16.r),
+                bottomRight: Radius.circular(16.r),
+              ),
+            ),
+            contentPadding: EdgeInsets.symmetric(
+              horizontal: 16.w,
+              vertical: 20.h,
+            ),
           ),
         ),
       ),

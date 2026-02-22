@@ -10,9 +10,11 @@ import 'package:provider/provider.dart';
 import 'package:oxcode_payroll/features/attendance/presentation/provider/attendance_provider.dart';
 import 'package:oxcode_payroll/general/core/widgets/premium_app_bar.dart';
 import 'package:oxcode_payroll/features/attendance/presentation/pages/face_punch_screen.dart';
+import 'package:oxcode_payroll/features/attendance/presentation/pages/qr_punch_screen.dart';
 import 'package:oxcode_payroll/features/attendance/domain/models/attendance_activity.dart';
 import 'package:oxcode_payroll/features/auth/presentation/provider/auth_provider.dart';
 import 'dart:ui';
+import 'package:oxcode_payroll/features/attendance/domain/models/punch_request.dart';
 
 class AttendanceScreen extends StatelessWidget {
   const AttendanceScreen({super.key});
@@ -275,10 +277,11 @@ class _AttendanceTimerParams extends StatelessWidget {
                           final auth = context.read<AuthProvider>();
                           final employee = auth.employeeProfile;
                           if (employee != null) {
-                            await provider.toggleAttendance(
-                              result as String,
-                              employee.id,
-                              employee.name,
+                            await provider.punch(
+                              type: PunchType.selfie,
+                              employeeId: employee.id,
+                              employeeName: employee.name,
+                              imagePath: result as String,
                             );
                           }
                         }
@@ -373,12 +376,110 @@ class _AttendanceTimerParams extends StatelessWidget {
                       ),
                     ),
                   ],
+                  if (!isCheckedIn) ...[
+                    SizedBox(height: 24.h),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildPunchOption(
+                            context,
+                            LucideIcons.qrCode,
+                            "QR Scan",
+                            Colors.blue,
+                            () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const QRPunchScreen(),
+                                ),
+                              );
+                              if (result != null) {
+                                final auth = context.read<AuthProvider>();
+                                final employee = auth.employeeProfile;
+                                if (employee != null) {
+                                  await provider.punch(
+                                    type: PunchType.qr,
+                                    employeeId: employee.id,
+                                    employeeName: employee.name,
+                                    qrCode: result as String,
+                                    skipLocation: true,
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                        SizedBox(width: 12.w),
+                        Expanded(
+                          child: _buildPunchOption(
+                            context,
+                            LucideIcons.wifi,
+                            "WiFi Punch",
+                            Colors.purple,
+                            () async {
+                              final auth = context.read<AuthProvider>();
+                              final employee = auth.employeeProfile;
+                              if (employee != null) {
+                                try {
+                                  await provider.punch(
+                                    type: PunchType.wifi,
+                                    employeeId: employee.id,
+                                    employeeName: employee.name,
+                                    skipLocation: true,
+                                  );
+                                } catch (e) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(content: Text(e.toString())),
+                                  );
+                                }
+                              }
+                            },
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildPunchOption(
+    BuildContext context,
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(16.r),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 16.h),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(16.r),
+          border: Border.all(color: color.withOpacity(0.2)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: color, size: 24.w),
+            SizedBox(height: 8.h),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontSize: 12.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

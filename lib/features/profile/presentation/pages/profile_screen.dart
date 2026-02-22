@@ -2,391 +2,217 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
 import 'package:oxcode_payroll/general/core/constants/app_colors.dart';
-import 'package:oxcode_payroll/general/core/widgets/premium_card.dart';
-import 'package:oxcode_payroll/general/core/animations/fade_in_slide.dart';
 import 'package:oxcode_payroll/general/core/widgets/premium_app_bar.dart';
-import 'package:oxcode_payroll/features/profile/presentation/pages/settings_screen.dart';
+import 'package:oxcode_payroll/features/auth/presentation/provider/auth_provider.dart';
+import 'package:oxcode_payroll/features/auth/domain/models/employee_model.dart';
+import 'package:provider/provider.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
+    final auth = context.watch<AuthProvider>();
+    final employee = auth.employeeProfile;
+
+    if (employee == null) {
+      return const Scaffold(body: Center(child: Text("No profile data")));
+    }
 
     return Scaffold(
-      appBar: PremiumAppBar(
-        title: 'Profile',
-        actions: [
-          IconButton(
-            icon: Icon(LucideIcons.settings2, size: 20.w),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const SettingsScreen()),
-              );
-            },
-          ),
-        ],
-      ),
+      appBar: const PremiumAppBar(title: "My Profile"),
       body: SingleChildScrollView(
-        padding: EdgeInsets.symmetric(horizontal: 24.w),
         child: Column(
           children: [
-            SizedBox(height: 16.h),
-            // Profile Header
-            FadeInSlide(
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Column(
-                    children: [
-                      Container(
-                        padding: EdgeInsets.all(4.r),
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          gradient: AppColors.primaryGradient,
-                        ),
-                        child: CircleAvatar(
-                          radius: 56.r,
-                          backgroundColor: theme.scaffoldBackgroundColor,
-                          child: CircleAvatar(
-                            radius: 52.r,
-                            backgroundColor: AppColors.primary.withOpacity(0.1),
-                            child: Hero(
-                              tag: 'profile_avatar',
-                              child: Text(
-                                'JD',
-                                style: TextStyle(
-                                  fontSize: 36.sp,
-                                  fontWeight: FontWeight.w900,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                      SizedBox(height: 16.h),
-                      Text(
-                        'John Doe',
-                        style: theme.textTheme.displayMedium?.copyWith(
-                          fontSize: 28.sp,
-                          letterSpacing: -0.5,
-                        ),
-                      ),
-                      SizedBox(height: 4.h),
-                      Text(
-                        'Senior Flutter Developer • #90302',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Positioned(
-                    top: 100.h,
-                    right: (1.sw / 2) - 100.w,
-                    child: Container(
-                      padding: EdgeInsets.all(8.r),
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: theme.scaffoldBackgroundColor,
-                          width: 3.w,
-                        ),
-                      ),
-                      child: Icon(
-                        LucideIcons.camera,
-                        size: 14.w,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: 32.h),
-
-            // Metrics Row
-            FadeInSlide(
-              offset: 20,
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildStatItem(
-                      context,
-                      '98%',
-                      'Attendance',
-                      LucideIcons.calendarCheck2,
-                      AppColors.success,
-                    ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: _buildStatItem(
-                      context,
-                      '12',
-                      'Leaves Left',
-                      LucideIcons.plane,
-                      AppColors.info,
-                    ),
-                  ),
-                  SizedBox(width: 12.w),
-                  Expanded(
-                    child: _buildStatItem(
-                      context,
-                      '4.9',
-                      'Performance',
-                      LucideIcons.star,
-                      AppColors.warning,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            SizedBox(height: 32.h),
-
-            // Sections
-            FadeInSlide(
-              offset: 40,
+            _buildHeader(employee),
+            Padding(
+              padding: EdgeInsets.all(20.w),
               child: Column(
                 children: [
-                  _buildSectionHeader(context, 'Employment Information'),
-                  SizedBox(height: 16.h),
-                  _buildInfoCard(context, [
-                    _InfoRow(
-                      LucideIcons.briefcase,
-                      'Department',
-                      'Engineering',
-                    ),
-                    _InfoRow(LucideIcons.calendar, 'Join Date', '12 Jan 2022'),
-                    _InfoRow(
-                      LucideIcons.mapPin,
-                      'Location',
-                      'San Francisco, US',
+                  _buildProfileSection("Personal Information", [
+                    _buildInfoTile(LucideIcons.mail, "Email", employee.email),
+                    _buildInfoTile(LucideIcons.phone, "Phone", employee.phone),
+                    _buildInfoTile(
+                      LucideIcons.calendar,
+                      "Joining Date",
+                      employee.joiningDate.toString().split(' ')[0],
                     ),
                   ]),
-
-                  SizedBox(height: 32.h),
-                  _buildSectionHeader(context, 'Personal Settings'),
-                  SizedBox(height: 16.h),
-                  _buildMenuItem(
-                    context,
-                    icon: LucideIcons.user,
-                    title: 'Personal Info',
-                    subtitle: 'E-mail, Phone, Address',
-                  ),
-                  SizedBox(height: 12.h),
-                  _buildMenuItem(
-                    context,
-                    icon: LucideIcons.landmark,
-                    title: 'Bank Details',
-                    subtitle: 'Salary account, IFSC, TDS',
-                  ),
-                  SizedBox(height: 12.h),
-                  _buildMenuItem(
-                    context,
-                    icon: LucideIcons.bell,
-                    title: 'Notifications',
-                    subtitle: 'Punch reminders, System alerts',
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => const SettingsScreen(),
-                        ),
-                      );
-                    },
-                  ),
-
-                  SizedBox(height: 32.h),
-                  _buildSectionHeader(context, 'Account Security'),
-                  SizedBox(height: 16.h),
-                  _buildMenuItem(
-                    context,
-                    icon: LucideIcons.shieldCheck,
-                    title: 'Change Password',
-                    subtitle: 'Last updated 3 months ago',
-                  ),
-                  SizedBox(height: 12.h),
-                  _buildMenuItem(
-                    context,
-                    icon: LucideIcons.logOut,
-                    title: 'Logout',
-                    subtitle: 'Safely exit the application',
-                    isDestructive: true,
-                    onTap: () {
-                      // Handle Logout
-                    },
-                  ),
+                  SizedBox(height: 20.h),
+                  _buildProfileSection("Bank Details", [
+                    _buildInfoTile(
+                      LucideIcons.landmark,
+                      "Bank Name",
+                      employee.bankName ?? "Not Set",
+                    ),
+                    _buildInfoTile(
+                      LucideIcons.creditCard,
+                      "Account Number",
+                      employee.accountNumber ?? "Not Set",
+                    ),
+                    _buildInfoTile(
+                      LucideIcons.hash,
+                      "IFSC Code",
+                      employee.ifscCode ?? "Not Set",
+                    ),
+                  ]),
+                  SizedBox(height: 20.h),
+                  _buildProfileSection("Emergency Contact", [
+                    _buildInfoTile(
+                      LucideIcons.user,
+                      "Relation / Name",
+                      employee.emergencyContactName ?? "Not Set",
+                    ),
+                    _buildInfoTile(
+                      LucideIcons.phoneCall,
+                      "Contact Number",
+                      employee.emergencyContactPhone ?? "Not Set",
+                    ),
+                  ]),
+                  SizedBox(height: 40.h),
+                  _buildLogoutButton(context, auth),
+                  SizedBox(height: 40.h),
                 ],
               ),
             ),
-            SizedBox(height: 48.h),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildStatItem(
-    BuildContext context,
-    String value,
-    String label,
-    IconData icon,
-    Color color,
-  ) {
-    return PremiumCard(
-      padding: EdgeInsets.symmetric(vertical: 16.h),
+  Widget _buildHeader(EmployeeModel employee) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(vertical: 40.h),
+      decoration: BoxDecoration(
+        color: AppColors.primary,
+        borderRadius: BorderRadius.only(
+          bottomLeft: Radius.circular(40.r),
+          bottomRight: Radius.circular(40.r),
+        ),
+      ),
       child: Column(
         children: [
-          Icon(icon, color: color, size: 20.w),
-          SizedBox(height: 8.h),
+          CircleAvatar(
+            radius: 50.r,
+            backgroundColor: Colors.white24,
+            child: Icon(LucideIcons.user, size: 50.w, color: Colors.white),
+          ),
+          SizedBox(height: 16.h),
           Text(
-            value,
+            employee.name,
             style: TextStyle(
-              fontSize: 18.sp,
+              color: Colors.white,
+              fontSize: 24.sp,
               fontWeight: FontWeight.bold,
-              letterSpacing: -0.5,
             ),
           ),
           Text(
-            label,
-            style: TextStyle(
-              fontSize: 10.sp,
-              color: Colors.grey[500],
-              fontWeight: FontWeight.w600,
-            ),
+            "${employee.designation} • ${employee.department}",
+            style: TextStyle(color: Colors.white70, fontSize: 14.sp),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(BuildContext context, String title) {
-    return Row(
+  Widget _buildProfileSection(String title, List<Widget> children) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
-          title.toUpperCase(),
+          title,
           style: TextStyle(
-            fontSize: 11.sp,
-            fontWeight: FontWeight.w900,
-            letterSpacing: 1.5,
-            color: Colors.grey[400],
+            fontSize: 16.sp,
+            fontWeight: FontWeight.bold,
+            color: Colors.grey[800],
           ),
         ),
-        SizedBox(width: 8.w),
-        Expanded(child: Divider(color: Colors.grey.withOpacity(0.1))),
+        SizedBox(height: 12.h),
+        Container(
+          padding: EdgeInsets.all(16.w),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20.r),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            children: children
+                .expand(
+                  (w) => [
+                    w,
+                    if (w != children.last)
+                      Divider(color: Colors.grey[100], height: 24.h),
+                  ],
+                )
+                .toList(),
+          ),
+        ),
       ],
     );
   }
 
-  Widget _buildInfoCard(BuildContext context, List<_InfoRow> rows) {
-    return PremiumCard(
-      padding: EdgeInsets.all(20.w),
-      child: Column(
-        children: rows.asMap().entries.map((entry) {
-          final isLast = entry.key == rows.length - 1;
-          final row = entry.value;
-          return Column(
+  Widget _buildInfoTile(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Icon(icon, color: AppColors.primary, size: 20.w),
+        SizedBox(width: 16.w),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Icon(row.icon, size: 16.w, color: AppColors.primary),
-                  SizedBox(width: 12.w),
-                  Text(
-                    row.label,
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      color: Colors.grey[500],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    row.value,
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
+              Text(
+                label,
+                style: TextStyle(color: Colors.grey[500], fontSize: 11.sp),
               ),
-              if (!isLast) ...[
-                SizedBox(height: 12.h),
-                Divider(color: Colors.grey.withOpacity(0.05)),
-                SizedBox(height: 12.h),
-              ],
+              Text(
+                value,
+                style: TextStyle(fontSize: 14.sp, fontWeight: FontWeight.w600),
+              ),
             ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLogoutButton(BuildContext context, AuthProvider auth) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56.h,
+      child: OutlinedButton.icon(
+        onPressed: () {
+          auth.logout();
+          Navigator.of(context).pushAndRemoveUntil(
+            MaterialPageRoute(
+              builder: (context) => const Center(child: Text("Logged Out")),
+            ), // Replace with LoginScreen if needed
+            (route) => false,
           );
-        }).toList(),
+        },
+        icon: const Icon(LucideIcons.logOut, color: Colors.red),
+        label: Text(
+          "Logout",
+          style: TextStyle(
+            color: Colors.red,
+            fontWeight: FontWeight.bold,
+            fontSize: 16.sp,
+          ),
+        ),
+        style: OutlinedButton.styleFrom(
+          side: const BorderSide(color: Colors.red),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.r),
+          ),
+        ),
       ),
     );
   }
-
-  Widget _buildMenuItem(
-    BuildContext context, {
-    required IconData icon,
-    required String title,
-    String? subtitle,
-    bool isDestructive = false,
-    VoidCallback? onTap,
-  }) {
-    return PremiumCard(
-      onTap: onTap,
-      padding: EdgeInsets.all(16.w),
-      child: Row(
-        children: [
-          Container(
-            padding: EdgeInsets.all(12.r),
-            decoration: BoxDecoration(
-              color: isDestructive
-                  ? AppColors.error.withOpacity(0.1)
-                  : AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(14.r),
-            ),
-            child: Icon(
-              icon,
-              color: isDestructive ? AppColors.error : AppColors.primary,
-              size: 20.w,
-            ),
-          ),
-          SizedBox(width: 16.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15.sp,
-                    color: isDestructive ? AppColors.error : null,
-                  ),
-                ),
-                if (subtitle != null) ...[
-                  SizedBox(height: 2.h),
-                  Text(
-                    subtitle,
-                    style: TextStyle(color: Colors.grey[500], fontSize: 11.sp),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Icon(LucideIcons.chevronRight, color: Colors.grey[300], size: 16.w),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow {
-  final IconData icon;
-  final String label;
-  final String value;
-  _InfoRow(this.icon, this.label, this.value);
 }

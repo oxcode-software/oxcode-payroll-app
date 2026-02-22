@@ -10,9 +10,31 @@ import 'package:oxcode_payroll/features/auth/presentation/provider/auth_provider
 import 'package:oxcode_payroll/general/core/widgets/premium_app_bar.dart';
 import 'package:oxcode_payroll/features/notifications/presentation/pages/notification_screen.dart';
 import 'package:oxcode_payroll/features/attendance/presentation/pages/face_punch_screen.dart';
+import 'package:oxcode_payroll/features/leave/presentation/pages/leave_history_screen.dart';
+import 'package:oxcode_payroll/features/roster/presentation/pages/roster_screen.dart';
+import 'package:oxcode_payroll/features/payroll/presentation/pages/payroll_screen.dart';
+import 'package:oxcode_payroll/features/expense/presentation/pages/expense_history_screen.dart';
+import 'package:oxcode_payroll/features/loan/presentation/pages/loan_history_screen.dart';
+import 'package:oxcode_payroll/features/profile/presentation/pages/profile_screen.dart';
+import 'package:oxcode_payroll/features/communication/presentation/provider/announcement_provider.dart';
+import 'package:intl/intl.dart';
+import 'package:oxcode_payroll/features/attendance/domain/models/punch_request.dart';
 
-class HomeDashboardScreen extends StatelessWidget {
+class HomeDashboardScreen extends StatefulWidget {
   const HomeDashboardScreen({super.key});
+
+  @override
+  State<HomeDashboardScreen> createState() => _HomeDashboardScreenState();
+}
+
+class _HomeDashboardScreenState extends State<HomeDashboardScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AnnouncementProvider>().listenAnnouncements();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -101,8 +123,10 @@ class HomeDashboardScreen extends StatelessWidget {
             const FadeInSlide(offset: 20, child: _QuickPunchCard()),
             SizedBox(height: 32.h),
 
-            // Statistics Row
+            // Statistics Row & Salary Summary
             const FadeInSlide(offset: 30, child: _ModernStatsRow()),
+            SizedBox(height: 24.h),
+            const FadeInSlide(offset: 35, child: _SalarySummaryCard()),
             SizedBox(height: 32.h),
 
             // Quick Actions Title
@@ -136,6 +160,18 @@ class HomeDashboardScreen extends StatelessWidget {
             ),
             SizedBox(height: 16.h),
             const FadeInSlide(offset: 50, child: _UpcomingHolidayCard()),
+            SizedBox(height: 32.h),
+
+            // Announcements Section
+            Text(
+              "Announcements",
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.bold,
+                fontSize: 20.sp,
+              ),
+            ),
+            SizedBox(height: 16.h),
+            const FadeInSlide(offset: 60, child: _AnnouncementsList()),
 
             SizedBox(height: 24.h),
           ],
@@ -187,19 +223,30 @@ class _QuickPunchCard extends StatelessWidget {
                             fontSize: 18.sp,
                           ),
                         ),
-                        Text(
-                          isCheckedIn
-                              ? "Shift started at 09:00 AM"
-                              : "Punch in to track your time",
-                          style: TextStyle(
-                            color: Colors.grey[600],
-                            fontSize: 13.sp,
+                        InkWell(
+                          onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const RosterScreen(),
+                            ),
+                          ),
+                          child: Text(
+                            isCheckedIn
+                                ? "Shift started at 09:00 AM"
+                                : "Next Shift: 09:00 AM - 06:00 PM",
+                            style: TextStyle(
+                              color: AppColors.primary,
+                              fontSize: 13.sp,
+                              decoration: TextDecoration.underline,
+                            ),
                           ),
                         ),
                       ],
                     ),
                   ),
-                  if (isCheckedIn)
+                  _buildShiftBadge(context, "General"),
+                  if (isCheckedIn) ...[
+                    SizedBox(width: 12.w),
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
@@ -217,6 +264,7 @@ class _QuickPunchCard extends StatelessWidget {
                         ),
                       ],
                     ),
+                  ],
                 ],
               ),
               SizedBox(height: 20.h),
@@ -230,10 +278,11 @@ class _QuickPunchCard extends StatelessWidget {
                     if (employee == null) return;
 
                     if (isCheckedIn) {
-                      await provider.toggleAttendance(
-                        null,
-                        employee.id,
-                        employee.name,
+                      await provider.punch(
+                        type: PunchType.gps,
+                        employeeId: employee.id,
+                        employeeName: employee.name,
+                        imagePath: null,
                       );
                     } else {
                       final result = await Navigator.push(
@@ -243,10 +292,11 @@ class _QuickPunchCard extends StatelessWidget {
                         ),
                       );
                       if (result != null) {
-                        await provider.toggleAttendance(
-                          result as String,
-                          employee.id,
-                          employee.name,
+                        await provider.punch(
+                          type: PunchType.selfie,
+                          employeeId: employee.id,
+                          employeeName: employee.name,
+                          imagePath: result as String,
                         );
                       }
                     }
@@ -287,6 +337,24 @@ class _QuickPunchCard extends StatelessWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildShiftBadge(BuildContext context, String shiftName) {
+    return Container(
+      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8.r),
+      ),
+      child: Text(
+        shiftName,
+        style: TextStyle(
+          color: AppColors.primary,
+          fontSize: 10.sp,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 }
@@ -393,6 +461,10 @@ class _BentoActionGrid extends StatelessWidget {
               LucideIcons.fileText,
               Colors.blue,
               1,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const PayrollScreen()),
+              ),
             ),
             SizedBox(width: 12.w),
             _buildBentoItem(
@@ -401,6 +473,12 @@ class _BentoActionGrid extends StatelessWidget {
               LucideIcons.calendarDays,
               Colors.orange,
               1,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LeaveHistoryScreen(),
+                ),
+              ),
             ),
           ],
         ),
@@ -413,6 +491,12 @@ class _BentoActionGrid extends StatelessWidget {
               LucideIcons.wallet,
               Colors.purple,
               1,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ExpenseHistoryScreen(),
+                ),
+              ),
             ),
             SizedBox(width: 12.w),
             _buildBentoItem(
@@ -421,6 +505,36 @@ class _BentoActionGrid extends StatelessWidget {
               LucideIcons.folderClosed,
               Colors.teal,
               1,
+            ),
+          ],
+        ),
+        SizedBox(height: 12.h),
+        Row(
+          children: [
+            _buildBentoItem(
+              context,
+              "Loans",
+              LucideIcons.banknote,
+              Colors.red,
+              1,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const LoanHistoryScreen(),
+                ),
+              ),
+            ),
+            SizedBox(width: 12.w),
+            _buildBentoItem(
+              context,
+              "Profile",
+              LucideIcons.user,
+              Colors.blueGrey,
+              1,
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ProfileScreen()),
+              ),
             ),
           ],
         ),
@@ -433,12 +547,13 @@ class _BentoActionGrid extends StatelessWidget {
     String title,
     IconData icon,
     Color color,
-    int flex,
-  ) {
+    int flex, {
+    VoidCallback? onTap,
+  }) {
     return Expanded(
       flex: flex,
       child: PremiumCard(
-        onTap: () {},
+        onTap: onTap ?? () {},
         padding: EdgeInsets.all(16.w),
         child: Row(
           children: [
@@ -522,6 +637,164 @@ class _UpcomingHolidayCard extends StatelessWidget {
           Icon(LucideIcons.chevronRight, color: Colors.grey[400], size: 20.w),
         ],
       ),
+    );
+  }
+}
+
+class _SalarySummaryCard extends StatelessWidget {
+  const _SalarySummaryCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return PremiumCard(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PayrollScreen()),
+      ),
+      padding: EdgeInsets.all(20.w),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(12.r),
+            decoration: BoxDecoration(
+              color: Colors.green.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            child: Icon(LucideIcons.banknote, color: Colors.green, size: 24.w),
+          ),
+          SizedBox(width: 16.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "Last Paid Salary",
+                  style: TextStyle(color: Colors.grey[600], fontSize: 13.sp),
+                ),
+                Text(
+                  "₹ 45,000.00",
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 20.sp,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Text(
+                "Jan 2026",
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 14.sp,
+                  color: AppColors.primary,
+                ),
+              ),
+              Text(
+                "Paid on 05 Feb",
+                style: TextStyle(fontSize: 10.sp, color: Colors.grey),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnnouncementsList extends StatelessWidget {
+  const _AnnouncementsList();
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer<AnnouncementProvider>(
+      builder: (context, provider, _) {
+        if (provider.isLoading && provider.announcements.isEmpty) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (provider.announcements.isEmpty) {
+          return Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: 20.h),
+              child: Text(
+                "No announcements yet",
+                style: TextStyle(color: Colors.grey, fontSize: 13.sp),
+              ),
+            ),
+          );
+        }
+
+        return ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: provider.announcements.length,
+          separatorBuilder: (_, __) => SizedBox(height: 12.h),
+          itemBuilder: (context, index) {
+            final announcement = provider.announcements[index];
+            return PremiumCard(
+              padding: EdgeInsets.all(16.w),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(10.r),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12.r),
+                    ),
+                    child: Icon(
+                      LucideIcons.info,
+                      color: AppColors.primary,
+                      size: 20.w,
+                    ),
+                  ),
+                  SizedBox(width: 16.w),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              announcement.title,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 15.sp,
+                              ),
+                            ),
+                            Text(
+                              DateFormat(
+                                'HH:mm',
+                              ).format(announcement.createdAt),
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 11.sp,
+                              ),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4.h),
+                        Text(
+                          announcement.content,
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 13.sp,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }

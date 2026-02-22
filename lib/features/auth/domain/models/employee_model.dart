@@ -14,7 +14,16 @@ class EmployeeModel {
   final EmploymentType employmentType;
   final EmployeeStatus status;
   final String? branchId;
+  final String? employeeCode;
+  final String companyCode;
+  final String? companyName;
+  final bool isBiometricEnabled;
   final Map<String, String> documents; // Document Type -> URL
+  final String? bankName;
+  final String? accountNumber;
+  final String? ifscCode;
+  final String? emergencyContactName;
+  final String? emergencyContactPhone;
 
   EmployeeModel({
     required this.id,
@@ -28,7 +37,16 @@ class EmployeeModel {
     required this.employmentType,
     required this.status,
     this.branchId,
+    this.employeeCode,
+    required this.companyCode,
+    this.companyName,
+    this.isBiometricEnabled = false,
     this.documents = const {},
+    this.bankName,
+    this.accountNumber,
+    this.ifscCode,
+    this.emergencyContactName,
+    this.emergencyContactPhone,
   });
 
   Map<String, dynamic> toMap() {
@@ -44,7 +62,16 @@ class EmployeeModel {
       'employmentType': employmentType.name,
       'status': status.name,
       'branchId': branchId,
+      'employeeCode': employeeCode,
+      'companyCode': companyCode,
+      'companyName': companyName,
+      'isBiometricEnabled': isBiometricEnabled,
       'documents': documents,
+      'bankName': bankName,
+      'accountNumber': accountNumber,
+      'ifscCode': ifscCode,
+      'emergencyContactName': emergencyContactName,
+      'emergencyContactPhone': emergencyContactPhone,
     };
   }
 
@@ -63,7 +90,16 @@ class EmployeeModel {
       ),
       status: EmployeeStatus.values.firstWhere((e) => e.name == map['status']),
       branchId: map['branchId'],
+      companyCode: map['companyCode'] ?? '',
+      companyName: map['companyName'],
+      isBiometricEnabled: map['isBiometricEnabled'] ?? false,
       documents: Map<String, String>.from(map['documents'] ?? {}),
+      bankName: map['bankName'],
+      accountNumber: map['accountNumber'],
+      ifscCode: map['ifscCode'],
+      emergencyContactName: map['emergencyContactName'],
+      emergencyContactPhone: map['emergencyContactPhone'],
+      employeeCode: map['employeeCode'],
     );
   }
 }
